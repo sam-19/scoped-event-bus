@@ -7,7 +7,7 @@
 
 import { getOrSetValue } from './util'
 import {
-    ScopedEventBus,
+    type ScopedEventBus,
     type ScopedEventCallback,
     type ScopedEventListener,
     type ScopedEventListenerOptions,
@@ -19,7 +19,34 @@ export { EventTypes }
 
 
 export default class EventBus extends EventTarget implements ScopedEventBus {
+
+    protected _patterns = new Map<string, { listener: ScopedEventListener, pattern: RegExp }[]>()
     protected _subscribers = new Map<string, ScopedEventListener[]>()
+
+    /**
+     * Check if the given `listener` matches the given parameters.
+     * @param listener - The listener to check.
+     * @param callback - Event callback function.
+     * @param subscriber - Name of the subscriber.
+     * @param scope - Optional scope of the event.
+     * @param phase - Optional phase of the event.
+     * @returns `true` if matches, `false` otherwise.
+     */
+    #isListenerMatch (
+        listener: ScopedEventListener,
+        callback: ScopedEventCallback,
+        subscriber: string,
+        scope?: string,
+        phase?: ScopedEventPhase,
+    ) {
+        return (
+            listener.callback === callback &&
+            listener.subscriber === subscriber &&
+            (!phase || listener.phase === phase) &&
+            (!scope || listener.scope === scope)
+        )
+    }
+
     addEventListener (type: string, callback: unknown, options?: unknown): void {
         if (typeof callback !== 'function') {
             return
@@ -43,7 +70,7 @@ export default class EventBus extends EventTarget implements ScopedEventBus {
         }
     }
     addScopedEventListener (
-        event: string|string[],
+        event: string|RegExp|(string|RegExp)[],
         callback: ScopedEventCallback,
         subscriber: string,
         scope?: string,
@@ -54,29 +81,48 @@ export default class EventBus extends EventTarget implements ScopedEventBus {
         }
         event_loop:
         for (const e of event) {
-            const subscribers = getOrSetValue(this._subscribers, e, [])
-            for (let i=0; i<subscribers.length; i++) {
-                const s = subscribers[i]
-                if (
-                    s.subscriber === subscriber &&
-                    s.phase === phase &&
-                    s.callback === callback
-                ) {
-                    if (!s.scope || s.scope === scope) {
-                        // Don't add the same subscriber multiple times.
-                        continue event_loop
-                    } else if (!scope) {
-                        // Replace all narrow context subscribers with the global context subscriber.
-                        subscribers.splice(i, 1)
+            if (typeof e === 'string') {
+                const subscribers = getOrSetValue(this._subscribers, e, [])
+                for (let i=0; i<subscribers.length; i++) {
+                    const s = subscribers[i]
+                    if (this.#isListenerMatch(s, callback, subscriber, scope, phase)) {
+                        if (!s.scope || s.scope === scope) {
+                            // Don't add the same subscriber multiple times.
+                            continue event_loop
+                        } else if (!scope) {
+                            // Replace all narrow context subscribers with the global context subscriber.
+                            subscribers.splice(i, 1)
+                        }
                     }
                 }
+                subscribers.push({
+                    callback: callback,
+                    phase: phase,
+                    scope: scope,
+                    subscriber: subscriber,
+                })
+            } else if (scope) {
+                const regexes = getOrSetValue(this._patterns, scope, [])
+                for (let i=0; i<regexes.length; i++) {
+                    const r = regexes[i]
+                    if (
+                        this.#isListenerMatch(r.listener, callback, subscriber, scope, phase) &&
+                        r.pattern.source === e.source
+                    ) {
+                        // Don't add the same subscriber multiple times.
+                        continue event_loop
+                    }
+                }
+                regexes.push({
+                    listener: {
+                        callback: callback,
+                        phase: phase,
+                        scope: scope,
+                        subscriber: subscriber,
+                    },
+                    pattern: e,
+                })
             }
-            subscribers.push({
-                callback: callback,
-                phase: phase,
-                scope: scope,
-                subscriber: subscriber,
-            })
         }
         return () => this.removeScopedEventListener(event, callback, subscriber, scope, phase)
     }
@@ -97,6 +143,15 @@ export default class EventBus extends EventTarget implements ScopedEventBus {
                     }
                 }
             }
+            // See if this scope has any patterned listeners and inform those.
+            const patterns = this._patterns.get(scope)
+            if (patterns) {
+                for (const regex of patterns) {
+                    if (event.match(regex.pattern)) {
+                        regex.listener.callback(e)
+                    }
+                }
+            }
         }
         // Dispatch a global event if it is not a 'before' event that has been cancelled.
         if (phase === 'after' || !e.cancelable || !e.defaultPrevented) {
@@ -107,22 +162,23 @@ export default class EventBus extends EventTarget implements ScopedEventBus {
     getEventHooks (event: string, subscriber: string, scope?: string) {
         const hooks = {
             after: (callback: ScopedEventCallback) => {
-                this.subscribe(event, callback, subscriber, scope, 'after')
+                this.addScopedEventListener(event, callback, subscriber, scope, 'after')
             },
             before: (callback: ScopedEventCallback) => {
-                this.subscribe(event, callback, subscriber, scope, 'before')
+                this.addScopedEventListener(event, callback, subscriber, scope, 'before')
             },
             unsubscribe: (phase?: ScopedEventPhase) => {
                 const listeners = this._subscribers.get(event)
                 if (listeners) {
-                    for (let i=0; i<listeners.length; i++) {
-                        const listener = listeners[i]
-                        if (
-                            listener.subscriber === subscriber && listener.scope === scope &&
-                            (!phase || listener.phase === phase)
-                        ) {
-                            this.unsubscribe(event, listener.callback, subscriber, scope, listener.phase)
-                            i--
+                    for (const listener of [...listeners]) {
+                        this.removeScopedEventListener(event, listener.callback, subscriber, scope, phase)
+                    }
+                }
+                if (scope) {
+                    const regexes = this._patterns.get(scope)
+                    if (regexes) {
+                        for (const regex of [...regexes]) {
+                            this.removeScopedEventListener(event, regex.listener.callback, subscriber, scope, phase)
                         }
                     }
                 }
@@ -144,6 +200,22 @@ export default class EventBus extends EventTarget implements ScopedEventBus {
                         break
                     }
                     i--
+                }
+            }
+        }
+        if (scope) {
+            const regexes = this._patterns.get(scope)
+            if (regexes) {
+                for (let i=0; i<regexes.length; i++) {
+                    if (regexes[i].listener.subscriber === subscriber) {
+                        regexes.splice(i, 1)
+                        if (!regexes.length) {
+                            // Remove empty keys from the map.
+                            this._subscribers.delete(scope)
+                            break
+                        }
+                        i--
+                    }
                 }
             }
         }
@@ -183,9 +255,10 @@ export default class EventBus extends EventTarget implements ScopedEventBus {
                 }
             }
         }
+        this._patterns.delete(scope)
     }
     removeScopedEventListener (
-        event: string|string[],
+        event: string|RegExp|(string|RegExp)[],
         callback: ScopedEventCallback,
         subscriber: string,
         scope?: string,
@@ -195,21 +268,34 @@ export default class EventBus extends EventTarget implements ScopedEventBus {
             event = [event]
         }
         for (const e of event) {
-            const subscribers = this._subscribers.get(e)
-            if (subscribers) {
-                for (let i=0; i<subscribers.length; i++) {
-                    if (
-                        subscribers[i].callback === callback &&
-                        subscribers[i].subscriber === subscriber &&
-                        (!phase || subscribers[i].phase === phase) &&
-                        (!scope || subscribers[i].scope === scope)
-                    ) {
-                        subscribers.splice(i, 1)
-                        if (!subscribers.length) {
-                            // Remove empty keys from the map.
-                            this._subscribers.delete(e)
+            if (typeof e === 'string') {
+                const subscribers = this._subscribers.get(e)
+                if (subscribers) {
+                    for (let i=0; i<subscribers.length; i++) {
+                        if (this.#isListenerMatch(subscribers[i], callback, subscriber, scope, phase)) {
+                            subscribers.splice(i, 1)
+                            if (!subscribers.length) {
+                                // Remove empty keys from the map.
+                                this._subscribers.delete(e)
+                            }
+                            break
                         }
-                        break
+                    }
+                }
+            } else if (scope) {
+                const regexes = this._patterns.get(scope)
+                if (regexes) {
+                    for (let i=0; i<regexes.length; i++) {
+                        if (
+                            this.#isListenerMatch(regexes[i].listener, callback, subscriber, scope, phase) &&
+                            regexes[i].pattern.source === e.source
+                        ) {
+                            regexes.splice(i, 1)
+                            if (!regexes.length) {
+                                // Remove empty keys from the map.
+                                this._patterns.delete(scope)
+                            }
+                        }
                     }
                 }
             }

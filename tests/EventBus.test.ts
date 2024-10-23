@@ -22,6 +22,10 @@ const lKeys = [
     'beforeSubscriber',
     'afterSubscriber',
     'shorthandListener',
+    'unsubscriber',
+    'regexListener1',
+    'regexListener2',
+    'regexListener3',
 ]
 for (const key of lKeys) {
     listeners[key] = jest.fn((event: Event) => {
@@ -115,6 +119,12 @@ describe('Event bus setup', () => {
             }, 1)
         }, 30)
     })
+    test ('Unsubsribe method.', () => {
+        const unsubscribe = bus.addScopedEventListener('unsubscribe', listeners['unsubscriber'], 'unsub', 'unsub')
+        expect(bus.subscribers.get('unsubscribe')?.length).toEqual(1)
+        unsubscribe()
+        expect(bus.subscribers.get('unsubscribe')).not.toBeDefined()
+    })
     test('Remove all scoped listeners.', () => {
         setTimeout(() => {
             bus.removeAllScopedEventListeners('sub-1')
@@ -193,6 +203,17 @@ describe('Event bus setup', () => {
                     expect(listeners['shorthandListener']).toBeCalledTimes(2)
                 }, 1)
             }, 1)
+        }, 1)
+    })
+    test('RegExp listeners.', () => {
+        bus.addScopedEventListener(/^regex-\d$/, listeners['regexListener1'], 'regex-1', 'regex')
+        bus.addScopedEventListener(/^regex-\d+$/, listeners['regexListener2'], 'regex-2', 'regex')
+        bus.dispatchScopedEvent('regex-1')
+        bus.dispatchScopedEvent('regex10')
+        setTimeout(() => {
+            expect(listeners['regexListener1']).toBeCalledTimes(1)
+            expect(listeners['regexListener2']).toBeCalledTimes(2)
+            bus.removeScope('regex')
         }, 1)
     })
 })

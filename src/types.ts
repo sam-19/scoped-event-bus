@@ -58,19 +58,20 @@ export interface ScopedEventBus {
     /**
      * Add a listener for an `event` or list of events. The listener can optionally be limited to trigger only if the
      * event originates from a specific `scope`.
-     * @param event - Event or list of events to listen for.
+     * @param event - Event or list of events to listen for, as either string (for exact match) or RegExp.
      * @param callback - Method to call when event occurs.
      * @param subscriber - Name of the subscriber.
      * @param scope - Optional scope to limit the listener to (omitted will listen to all scopes).
      * @param phase - Event phase to trigger the callback in (optional, default _after_).
+     * @returns A method to remove the added event listener(s).
      */
     addScopedEventListener (
-        event: string|string[],
+        event: string|RegExp|(string|RegExp)[],
         callback: ScopedEventCallback,
         subscriber: string,
         scope?: string,
         phase?: ScopedEventPhase,
-    ): void
+    ): ScopedEventUnsubscriber
     /**
      * Dispatch an `event` that can optinally declare a specific `scope`.
      * @param event - Name of the event.
@@ -172,9 +173,20 @@ export type ScopedEventCallback = (event: ScopedEvent) => void
  * hooks.unsubscribe()
  */
 export type ScopedEventHooks = {
+    /**
+     * Add a `callback` to be executed before the event takes place.
+     * @param callback - The callback to execute.
+     */
     after: (callback: ScopedEventCallback) => void
+    /**
+     * Add a `callback` to be executed after the event has taken place.
+     * @param callback - The callback to execute.
+     */
     before: (callback: ScopedEventCallback) => void
-    unsubscribe: (phase?: ScopedEventPhase) => void
+    /**
+     * Remove all event listeners for this subscriber, optionally for the given `phase`.
+     */
+    unsubscribe: ScopedEventUnsubscriber
 }
 /**
  * A listener entry in the event bus listener map.
@@ -197,3 +209,7 @@ export type ScopedEventListenerOptions = {
  * Phase of the scoped event.
  */
 export type ScopedEventPhase = 'after' | 'before'
+/**
+ * Calling this method will remove the event listeners added by the `subscribe` method that returned it.
+ */
+export type ScopedEventUnsubscriber = (phase?: ScopedEventPhase) => void

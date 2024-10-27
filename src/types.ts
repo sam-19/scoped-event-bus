@@ -120,7 +120,7 @@ export interface ScopedEventBus {
      * @param phase - Optional phase of the event (omitted or undefined will match any phase).
      */
     removeScopedEventListener (
-        event: string|string[],
+        event: string|RegExp|(string|RegExp)[],
         callback: ScopedEventCallback,
         subscriber: string,
         scope?: string,

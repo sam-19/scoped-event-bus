@@ -138,7 +138,7 @@ export default class EventBus extends EventTarget implements ScopedEventBus {
             const subs = this._subscribers.get(event)
             if (subs) {
                 for (const sub of subs) {
-                    if (sub.scope === scope) {
+                    if (sub.scope === scope && sub.phase === phase) {
                         sub.callback(e)
                     }
                 }
@@ -147,7 +147,7 @@ export default class EventBus extends EventTarget implements ScopedEventBus {
             const patterns = this._patterns.get(scope)
             if (patterns) {
                 for (const regex of patterns) {
-                    if (event.match(regex.pattern)) {
+                    if (event.match(regex.pattern) && regex.listener.phase === phase) {
                         regex.listener.callback(e)
                     }
                 }

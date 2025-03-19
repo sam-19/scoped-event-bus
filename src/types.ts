@@ -23,6 +23,13 @@
  */
 export interface ScopedEventBus {
     /**
+     * Debug callback for verbose logging of all events.
+     *
+     * **NOTE!** Depending on the implementation, debug feedback may generate a large amount of console log output, may
+     * expose sensitive event detail information, and use excessive amounts of memory. Not to be used in production.
+     */
+    debugCallback: null|ScopedEventCallback
+    /**
      * Appends an event listener for events whose type attribute value is `type`. The callback argument sets the
      * `callback` that will be invoked when the event is dispatched.
      *
@@ -78,13 +85,14 @@ export interface ScopedEventBus {
      * @param scope - Optional scope where the event originates from.
      * @param phase - Event phase (optional, default _after_).
      * @param detail - Optional `CustomEvent` details.
+     * @returns A promise that resolves with `true` if the event was not canceled, false if it was.
      */
     dispatchScopedEvent (
         event: string,
         scope?: string,
         phase?: ScopedEventPhase,
         detail?: { [key: string]: unknown },
-    ): boolean
+    ): Promise<boolean>
     /**
      * Get methods for adding listeners to the `before` and `after` phases of a specific `event`.
      * The `unsubscribe` method returned alongside the hooks can be used to unsubscribe from both phases.
@@ -152,7 +160,7 @@ export type ScopedEvent = Event & {
 /**
  * Callback function for scoped events.
  */
-export type ScopedEventCallback = (event: ScopedEvent) => void
+export type ScopedEventCallback = (event: ScopedEvent) => void|Promise<void>
 /**
  * Hooks for setting listeners for the `before` and `after` phases of the event.
  *

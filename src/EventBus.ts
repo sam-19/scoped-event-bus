@@ -6,12 +6,12 @@
  */
 
 import { getOrSetValue } from './util'
-import {
-    type ScopedEventBus,
-    type ScopedEventCallback,
-    type ScopedEventListener,
-    type ScopedEventListenerOptions,
-    type ScopedEventPhase,
+import type {
+    ScopedEventBus,
+    ScopedEventCallback,
+    ScopedEventListener,
+    ScopedEventListenerOptions,
+    ScopedEventPhase,
 } from './types'
 
 import EventTypes from './EventTypes'
@@ -20,8 +20,16 @@ export { EventTypes }
 
 export default class EventBus extends EventTarget implements ScopedEventBus {
 
-    protected _patterns = new Map<string, { listener: ScopedEventListener, pattern: RegExp }[]>()
-    protected _subscribers = new Map<string, ScopedEventListener[]>()
+    _debugCallback = null as null|ScopedEventCallback
+    _patterns = new Map<string, { listener: ScopedEventListener, pattern: RegExp }[]>()
+    _subscribers = new Map<string, ScopedEventListener[]>()
+
+    set debugCallback (value: null|ScopedEventCallback) {
+        this._debugCallback = value
+    }
+    get debugCallback () {
+        return this._debugCallback
+    }
 
     /**
      * Check if the given `listener` matches the given parameters.
@@ -126,7 +134,13 @@ export default class EventBus extends EventTarget implements ScopedEventBus {
         }
         return () => this.removeScopedEventListener(event, callback, subscriber, scope, phase)
     }
-    dispatchScopedEvent (
+    dispatchEvent (event: Event): boolean {
+        if (this._debugCallback) {
+            this._debugCallback({ ...event, detail: { phase: 'after' } })
+        }
+        return super.dispatchEvent(event)
+    }
+    async dispatchScopedEvent (
         event: string,
         scope?: string,
         phase: ScopedEventPhase = 'after',
@@ -139,7 +153,7 @@ export default class EventBus extends EventTarget implements ScopedEventBus {
             if (subs) {
                 for (const sub of subs) {
                     if (sub.scope === scope && sub.phase === phase) {
-                        sub.callback(e)
+                        await sub.callback(e)
                     }
                 }
             }
@@ -148,10 +162,14 @@ export default class EventBus extends EventTarget implements ScopedEventBus {
             if (patterns) {
                 for (const regex of patterns) {
                     if (event.match(regex.pattern) && regex.listener.phase === phase) {
-                        regex.listener.callback(e)
+                        await regex.listener.callback(e)
                     }
                 }
             }
+        }
+        // Relay event to possible debug listener.
+        if (this._debugCallback) {
+            this._debugCallback(e)
         }
         // Dispatch a global event if it is not a 'before' event that has been cancelled.
         if (phase === 'after' || !e.cancelable || !e.defaultPrevented) {

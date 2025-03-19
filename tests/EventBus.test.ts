@@ -14,18 +14,19 @@ const scopeMap = new Map<string, number>()
 let customProperty = false
 const listeners = {} as { [key: string]: jest.Mock<void, [event: Event], any> }
 const lKeys = [
-    'globalListener',
-    'scopedListener1',
-    'scopedListener2',
-    'scopedListener3',
-    'customListener',
+    'debug',
+    'global',
+    'scoped1',
+    'scoped2',
+    'scoped3',
+    'custom',
     'beforeSubscriber',
     'afterSubscriber',
-    'shorthandListener',
+    'shorthand',
     'unsubscriber',
-    'regexListener1',
-    'regexListener2',
-    'regexListener3',
+    'regex1',
+    'regex2',
+    'regex3',
 ]
 for (const key of lKeys) {
     listeners[key] = jest.fn((event: Event) => {
@@ -45,37 +46,38 @@ const bus = new EventBus()
 describe('Event bus setup', () => {
     test('Event bus can be constructed.', () => {
         expect(bus).toBeTruthy()
-        bus.addEventListener('test', listeners['globalListener'])
+        bus.debugCallback = listeners['debug']
+        bus.addEventListener('test', listeners['global'])
     })
     test('Global events via EventTarget.', async () => {
         bus.dispatchScopedEvent('test')
         setTimeout(() => {
-            expect(listeners['globalListener']).toBeCalledTimes(1)
+            expect(listeners['global']).toBeCalledTimes(1)
             expect(scopeMap.keys()).toEqual(['test'])
             expect(scopeMap.get('test')).toStrictEqual(1)
             bus.dispatchScopedEvent('test2')
             setTimeout(() => {
-                expect(listeners['globalListener']).toBeCalledTimes(1)
+                expect(listeners['global']).toBeCalledTimes(1)
             }, 1)
         }, 1)
     })
     test('Scoped events.', () => {
         setTimeout(() => {
-            bus.addScopedEventListener('test', listeners['scopedListener1'], 'sub-1', 'scope-1')
+            bus.addScopedEventListener('test', listeners['scoped1'], 'sub-1', 'scope-1')
             expect(bus.subscribers.get('test')?.length).toEqual(1)
             bus.dispatchScopedEvent('test', 'scope-1')
             setTimeout(() => {
-                expect(listeners['globalListener']).toBeCalledTimes(2)
-                expect(listeners['scopedListener1']).toBeCalledTimes(1)
+                expect(listeners['global']).toBeCalledTimes(2)
+                expect(listeners['scoped1']).toBeCalledTimes(1)
                 expect(scopeMap.keys()).toEqual(['test'])
                 expect(scopeMap.get('test')).toStrictEqual(3)
-                bus.addScopedEventListener('test', listeners['scopedListener2'], 'sub-1', 'scope-2')
+                bus.addScopedEventListener('test', listeners['scoped2'], 'sub-1', 'scope-2')
                 expect(bus.subscribers.get('test')?.length).toEqual(2)
                 bus.dispatchScopedEvent('test', 'scope-2')
                 setTimeout(() => {
-                    expect(listeners['globalListener']).toBeCalledTimes(3)
-                    expect(listeners['scopedListener1']).toBeCalledTimes(1)
-                    expect(listeners['scopedListener2']).toBeCalledTimes(1)
+                    expect(listeners['global']).toBeCalledTimes(3)
+                    expect(listeners['scoped1']).toBeCalledTimes(1)
+                    expect(listeners['scoped2']).toBeCalledTimes(1)
                     expect(scopeMap.keys()).toEqual(['test'])
                     expect(scopeMap.get('test')).toStrictEqual(5)
                 }, 1)
@@ -84,37 +86,37 @@ describe('Event bus setup', () => {
     })
     test('Remove listener.', () => {
         setTimeout(() => {
-            bus.addScopedEventListener('test', listeners['scopedListener3'], 'sub-2', 'scope-3')
+            bus.addScopedEventListener('test', listeners['scoped3'], 'sub-2', 'scope-3')
             expect(bus.subscribers.get('test')?.length).toEqual(3)
             bus.dispatchScopedEvent('test', 'scope-3')
             bus.dispatchScopedEvent('test', 'scope-2')
             setTimeout(() => {
-                expect(listeners['globalListener']).toBeCalledTimes(4)
-                expect(listeners['scopedListener2']).toBeCalledTimes(2)
-                expect(listeners['scopedListener3']).toBeCalledTimes(1)
-                bus.removeEventListener('test', listeners['scopedListener3'])
+                expect(listeners['global']).toBeCalledTimes(4)
+                expect(listeners['scoped2']).toBeCalledTimes(2)
+                expect(listeners['scoped3']).toBeCalledTimes(1)
+                bus.removeEventListener('test', listeners['scoped3'])
                 expect(bus.subscribers.get('test')?.length).toEqual(2)
                 bus.dispatchScopedEvent('test', 'scope-3')
                 setTimeout(() => {
-                    expect(listeners['globalListener']).toBeCalledTimes(5)
-                    expect(listeners['scopedListener3']).toBeCalledTimes(1)
+                    expect(listeners['global']).toBeCalledTimes(5)
+                    expect(listeners['scoped3']).toBeCalledTimes(1)
                 }, 1)
             }, 1)
         }, 20)
     })
     test('Remove scoped listener.', () => {
         setTimeout(() => {
-            bus.removeScopedEventListener('test', listeners['scopedListener2'], 'sub-1', 'scope-2')
+            bus.removeScopedEventListener('test', listeners['scoped2'], 'sub-1', 'scope-2')
             expect(bus.subscribers.get('test')?.length).toEqual(1)
             bus.dispatchScopedEvent('test', 'scope-2')
             setTimeout(() => {
-                expect(listeners['globalListener']).toBeCalledTimes(5)
-                expect(listeners['scopedListener2']).toBeCalledTimes(2)
-                bus.addScopedEventListener('test', listeners['scopedListener2'], 'sub-1', 'scope-2')
+                expect(listeners['global']).toBeCalledTimes(5)
+                expect(listeners['scoped2']).toBeCalledTimes(2)
+                bus.addScopedEventListener('test', listeners['scoped2'], 'sub-1', 'scope-2')
                 expect(bus.subscribers.get('test')?.length).toEqual(2)
                 bus.dispatchScopedEvent('test', 'scope-2')
                 setTimeout(() => {
-                    expect(listeners['scopedListener2']).toBeCalledTimes(3)
+                    expect(listeners['scoped2']).toBeCalledTimes(3)
                 }, 1)
             }, 1)
         }, 30)
@@ -132,10 +134,10 @@ describe('Event bus setup', () => {
             bus.dispatchScopedEvent('test', 'scope-1')
             bus.dispatchScopedEvent('test', 'scope-2')
             setTimeout(() => {
-                expect(listeners['scopedListener1']).toBeCalledTimes(1)
-                expect(listeners['scopedListener2']).toBeCalledTimes(3)
-                bus.addScopedEventListener('test', listeners['scopedListener1'], 'sub-1', 'scope-1')
-                bus.addScopedEventListener('test', listeners['scopedListener2'], 'sub-1', 'scope-2')
+                expect(listeners['scoped1']).toBeCalledTimes(1)
+                expect(listeners['scoped2']).toBeCalledTimes(3)
+                bus.addScopedEventListener('test', listeners['scoped1'], 'sub-1', 'scope-1')
+                bus.addScopedEventListener('test', listeners['scoped2'], 'sub-1', 'scope-2')
                 expect(bus.subscribers.get('test')?.length).toEqual(3)
             }, 1)
         }, 40)
@@ -145,24 +147,24 @@ describe('Event bus setup', () => {
             bus.removeScope('scope-1')
             bus.dispatchScopedEvent('test', 'scope-1')
             setTimeout(() => {
-                expect(listeners['scopedListener1']).toBeCalledTimes(1)
+                expect(listeners['scoped1']).toBeCalledTimes(1)
                 expect(bus.subscribers.get('test')?.length).toEqual(2)
             }, 1)
         }, 50)
     })
     test('Custom event details.', () => {
         setTimeout(() => {
-            bus.addScopedEventListener('test', listeners['customListener'], 'sub-4', 'scope-1')
+            bus.addScopedEventListener('test', listeners['custom'], 'sub-4', 'scope-1')
             bus.dispatchScopedEvent('test', 'scope-1', 'after', { customProperty: true })
             setTimeout(() => {
-                expect(listeners['customListener']).toBeCalledTimes(1)
+                expect(listeners['custom']).toBeCalledTimes(1)
                 expect(customProperty).toStrictEqual(true)
             }, 1)
         }, 60)
     })
     test('Event hooks.', () => {
         setTimeout(() => {
-            listeners['globalListener'].mockReset()
+            listeners['global'].mockReset()
             const hooks = bus.getEventHooks('test-2', 'sub-5')
             hooks.before(listeners['beforeSubscriber'])
             hooks.after(listeners['afterSubscriber'])
@@ -180,40 +182,43 @@ describe('Event bus setup', () => {
                     bus.dispatchScopedEvent('test-2')
                     setTimeout(() => {
                         expect(listeners['afterSubscriber']).toBeCalledTimes(2)
-                        expect(listeners['globalListener']).toBeCalledTimes(0)
+                        expect(listeners['global']).toBeCalledTimes(0)
                     }, 1)
                 }, 1)
             }, 1)
         }, 70)
     })
     test('Shorthand functions.', () => {
-        bus.subscribe('test-3', listeners['shorthandListener'], 'sub-6', 'scope-4')
-        bus.subscribe('test-4', listeners['shorthandListener'], 'sub-7', 'scope-4')
+        bus.subscribe('test-3', listeners['shorthand'], 'sub-6', 'scope-4')
+        bus.subscribe('test-4', listeners['shorthand'], 'sub-7', 'scope-4')
         bus.dispatchScopedEvent('test-3')
         bus.dispatchScopedEvent('test-4')
         setTimeout(() => {
-            expect(listeners['shorthandListener']).toBeCalledTimes(2)
-            bus.unsubscribe('test-3', listeners['shorthandListener'], 'sub-6')
+            expect(listeners['shorthand']).toBeCalledTimes(2)
+            bus.unsubscribe('test-3', listeners['shorthand'], 'sub-6')
             bus.dispatchScopedEvent('test-3')
             setTimeout(() => {
-                expect(listeners['shorthandListener']).toBeCalledTimes(2)
+                expect(listeners['shorthand']).toBeCalledTimes(2)
                 bus.unsubscribeAll('sub-7')
                 bus.dispatchScopedEvent('test-4')
                 setTimeout(() => {
-                    expect(listeners['shorthandListener']).toBeCalledTimes(2)
+                    expect(listeners['shorthand']).toBeCalledTimes(2)
                 }, 1)
             }, 1)
         }, 1)
     })
     test('RegExp listeners.', () => {
-        bus.addScopedEventListener(/^regex-\d$/, listeners['regexListener1'], 'regex-1', 'regex')
-        bus.addScopedEventListener(/^regex-\d+$/, listeners['regexListener2'], 'regex-2', 'regex')
+        bus.addScopedEventListener(/^regex-\d$/, listeners['regex1'], 'regex-1', 'regex')
+        bus.addScopedEventListener(/^regex-\d+$/, listeners['regex2'], 'regex-2', 'regex')
         bus.dispatchScopedEvent('regex-1')
         bus.dispatchScopedEvent('regex10')
         setTimeout(() => {
-            expect(listeners['regexListener1']).toBeCalledTimes(1)
-            expect(listeners['regexListener2']).toBeCalledTimes(2)
+            expect(listeners['regex1']).toBeCalledTimes(1)
+            expect(listeners['regex2']).toBeCalledTimes(2)
             bus.removeScope('regex')
         }, 1)
+    })
+    test('Debug listener.', () => {
+        expect(listeners['debug']).toBeCalledTimes(10)
     })
 })

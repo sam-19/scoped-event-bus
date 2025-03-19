@@ -140,7 +140,7 @@ export default class EventBus extends EventTarget implements ScopedEventBus {
         }
         return super.dispatchEvent(event)
     }
-    async dispatchScopedEvent (
+    dispatchScopedEvent (
         event: string,
         scope?: string,
         phase: ScopedEventPhase = 'after',
@@ -153,7 +153,7 @@ export default class EventBus extends EventTarget implements ScopedEventBus {
             if (subs) {
                 for (const sub of subs) {
                     if (sub.scope === scope && sub.phase === phase) {
-                        await sub.callback(e)
+                        sub.callback(e)
                     }
                 }
             }
@@ -162,7 +162,7 @@ export default class EventBus extends EventTarget implements ScopedEventBus {
             if (patterns) {
                 for (const regex of patterns) {
                     if (event.match(regex.pattern) && regex.listener.phase === phase) {
-                        await regex.listener.callback(e)
+                        regex.listener.callback(e)
                     }
                 }
             }

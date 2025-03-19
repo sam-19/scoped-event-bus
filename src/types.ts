@@ -85,14 +85,14 @@ export interface ScopedEventBus {
      * @param scope - Optional scope where the event originates from.
      * @param phase - Event phase (optional, default _after_).
      * @param detail - Optional `CustomEvent` details.
-     * @returns A promise that resolves with `true` if the event was not canceled, false if it was.
+     * @returns True if the event was not canceled, false if it was.
      */
     dispatchScopedEvent (
         event: string,
         scope?: string,
         phase?: ScopedEventPhase,
         detail?: { [key: string]: unknown },
-    ): Promise<boolean>
+    ): boolean
     /**
      * Get methods for adding listeners to the `before` and `after` phases of a specific `event`.
      * The `unsubscribe` method returned alongside the hooks can be used to unsubscribe from both phases.
@@ -160,7 +160,7 @@ export type ScopedEvent = Event & {
 /**
  * Callback function for scoped events.
  */
-export type ScopedEventCallback = (event: ScopedEvent) => void|Promise<void>
+export type ScopedEventCallback = (event: ScopedEvent) => void
 /**
  * Hooks for setting listeners for the `before` and `after` phases of the event.
  *

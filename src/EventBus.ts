@@ -147,16 +147,16 @@ export default class EventBus extends EventTarget implements ScopedEventBus {
         detail?: { [key: string]: unknown }
     ) {
         const e = new CustomEvent(event, { detail: { phase: phase, scope: scope, ...detail } })
-        if (scope) {
-            // Inform the listeners that are only subscribed to this scope.
-            const subs = this._subscribers.get(event)
-            if (subs) {
-                for (const sub of subs) {
-                    if (sub.scope === scope && sub.phase === phase) {
-                        sub.callback(e)
-                    }
+        // Inform the listeners that are subscribed to this scope.
+        const subs = this._subscribers.get(event)
+        if (subs) {
+            for (const sub of subs) {
+                if ((!sub.scope || sub.scope === scope) && sub.phase === phase) {
+                    sub.callback(e)
                 }
             }
+        }
+        if (scope) {
             // See if this scope has any patterned listeners and inform those.
             const patterns = this._patterns.get(scope)
             if (patterns) {

@@ -5,7 +5,6 @@
  * @license    MIT
  */
 
-import { describe, expect, test } from '@jest/globals'
 import EventBus from './EventBusTester'
 import { getOrSetValue } from '../src/util'
 

@@ -5,7 +5,7 @@
  * @license    MIT
  */
 
-import { getOrSetValue } from './util'
+import { getOrSetValue } from './util.js'
 import type {
     ScopedEventBus,
     ScopedEventCallback,
@@ -14,7 +14,7 @@ import type {
     ScopedEventPhase,
 } from './types'
 
-import EventTypes from './EventTypes'
+import EventTypes from './EventTypes.js'
 export { EventTypes }
 
 

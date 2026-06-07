@@ -1,3 +1,3 @@
-import EventBus from './EventBus'
+import EventBus from './EventBus.js'
 
 export { EventBus }

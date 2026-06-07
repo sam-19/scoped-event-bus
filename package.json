@@ -2,7 +2,9 @@
   "name": "scoped-event-bus",
   "version": "0.2.5",
   "description": "A Typescript event bus with scoped events",
+  "type": "module",
   "main": "dist/index.js",
+  "module": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
     ".": {

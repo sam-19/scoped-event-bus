@@ -8,6 +8,9 @@
 import EventBus from '../src/EventBus'
 
 export default class EventBusTester extends EventBus {
+    get patterns () {
+        return this._patterns
+    }
     get subscribers () {
         return this._subscribers
     }

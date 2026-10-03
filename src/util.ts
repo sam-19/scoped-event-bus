@@ -15,7 +15,7 @@
  * @returns Value stored at the given key.
  */
 export const getOrSetValue = <T>(
-    map: Map<typeof key, typeof value>,
+    map: Map<string|number, T>,
     key: string|number,
     value: T
 ): T => {

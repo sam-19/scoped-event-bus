@@ -7,6 +7,7 @@
 
 import { getOrSetValue } from './util.js'
 import type {
+    ScopedEvent,
     ScopedEventBus,
     ScopedEventCallback,
     ScopedEventListener,
@@ -61,8 +62,7 @@ export default class EventBus extends EventTarget implements ScopedEventBus {
         }
         const scopedOpts = options as ScopedEventListenerOptions
         if (options && typeof options === 'object' && scopedOpts.subscriber) {
-            const scopedOpts = options as ScopedEventListenerOptions
-            if (scopedOpts?.phase && scopedOpts.scope && scopedOpts.subscriber) {
+            if (scopedOpts.phase && scopedOpts.scope) {
                 this.addScopedEventListener(
                     type,
                     callback as ScopedEventCallback,
@@ -136,7 +136,23 @@ export default class EventBus extends EventTarget implements ScopedEventBus {
     }
     dispatchEvent (event: Event): boolean {
         if (this._debugCallback) {
-            this._debugCallback({ ...event, detail: { phase: 'after' } })
+            const detail = (event as Partial<ScopedEvent>).detail
+            if (!detail?.phase) {
+                // A phase means `dispatchScopedEvent` built this event and reported it before
+                // handing it here, so reporting again would deliver the same event twice. Anything
+                // else has not been reported yet and is reported as it is.
+                //
+                // Except a plain `Event`, which carries no `detail` at all. Spreading one copies
+                // nothing -- every property of an Event lives on its prototype -- so a spread
+                // leaves the listener an object that does not even name the event. A `CustomEvent`
+                // of the same type is reported in its place, which carries the name and a
+                // well-formed detail.
+                this._debugCallback(
+                    detail
+                        ? event as ScopedEvent
+                        : new CustomEvent(event.type, { detail: { phase: 'after' } }) as ScopedEvent
+                )
+            }
         }
         return super.dispatchEvent(event)
     }
@@ -228,8 +244,11 @@ export default class EventBus extends EventTarget implements ScopedEventBus {
                     if (regexes[i].listener.subscriber === subscriber) {
                         regexes.splice(i, 1)
                         if (!regexes.length) {
-                            // Remove empty keys from the map.
-                            this._subscribers.delete(scope)
+                            // Remove empty keys from the map the emptied list belongs to. Scopes and
+                            // event names are separate key spaces, so deleting this scope from the
+                            // subscriber map leaves the empty pattern list in place and removes
+                            // every listener of whichever event shares the scope's name.
+                            this._patterns.delete(scope)
                             break
                         }
                         i--

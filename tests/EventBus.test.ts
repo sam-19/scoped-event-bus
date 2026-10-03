@@ -336,6 +336,29 @@ describe('Pattern listeners', () => {
     })
 })
 
+describe('removeAllScopedEventListeners empties the map the listeners came from', () => {
+    test('the emptied pattern list is removed from the pattern map', () => {
+        const pattern = listener()
+        bus.addScopedEventListener(/^match-/, pattern, 'sub', 'scope-1')
+        expect(bus.patterns.get('scope-1')).toHaveLength(1)
+        bus.removeAllScopedEventListeners('sub', 'scope-1')
+        expect(bus.patterns.get('scope-1')).not.toBeDefined()
+        bus.dispatchScopedEvent('match-1', 'scope-1')
+        expect(pattern).not.toBeCalled()
+    })
+    test('an event whose name matches the scope keeps its listeners', () => {
+        // Scopes and event names are separate key spaces, so clearing a scope's patterns must not
+        // reach into the subscriber map for a key that happens to carry the same name.
+        const named = listener()
+        const pattern = listener()
+        bus.addScopedEventListener('scope-1', named, 'other-sub')
+        bus.addScopedEventListener(/^match-/, pattern, 'sub', 'scope-1')
+        bus.removeAllScopedEventListeners('sub', 'scope-1')
+        bus.dispatchScopedEvent('scope-1')
+        expect(named).toBeCalledTimes(1)
+    })
+})
+
 describe('Debug callback', () => {
     test('a dispatched event is relayed to the debug callback', () => {
         const debug = listener()
@@ -344,19 +367,35 @@ describe('Debug callback', () => {
         expect(debug).toBeCalled()
         expect((debug.mock.calls[0][0] as CustomEvent).detail.scope).toStrictEqual('scope-1')
     })
-    /**
-     * Current behaviour, pinned rather than endorsed: dispatchScopedEvent relays the event and then
-     * calls dispatchEvent, which relays a second time. The second payload spreads an Event, which
-     * copies no own properties, so it names neither the event nor its scope.
-     */
-    test('one scoped dispatch reaches the debug callback twice', () => {
+    test('one scoped dispatch reaches the debug callback once', () => {
+        // `dispatchScopedEvent` relays the event it built and then hands it to `dispatchEvent`,
+        // which must not relay the same event a second time.
         const debug = listener()
         bus.debugCallback = debug
         bus.dispatchScopedEvent('test', 'scope-1')
-        expect(debug).toBeCalledTimes(2)
-        const second = debug.mock.calls[1][0] as CustomEvent
-        expect(second.type).not.toBeDefined()
-        expect(second.detail.scope).not.toBeDefined()
+        expect(debug).toBeCalledTimes(1)
+    })
+    test('a plain dispatch is relayed with the name of the event', () => {
+        // Spreading an Event copies none of its properties, so the relayed payload used to name
+        // neither the event nor a phase.
+        const debug = listener()
+        bus.debugCallback = debug
+        bus.dispatchEvent(new Event('plain'))
+        expect(debug).toBeCalledTimes(1)
+        const relayed = debug.mock.calls[0][0] as CustomEvent
+        expect(relayed.type).toStrictEqual('plain')
+        expect(relayed.detail.phase).toStrictEqual('after')
+    })
+    test('an event the caller built itself is relayed with its own detail', () => {
+        // Skipping every CustomEvent to avoid the double relay would take this one with it, and the
+        // detail the caller set is the part a debug listener wants.
+        const debug = listener()
+        bus.debugCallback = debug
+        bus.dispatchEvent(new CustomEvent('mine', { detail: { mine: true } }))
+        expect(debug).toBeCalledTimes(1)
+        const relayed = debug.mock.calls[0][0] as CustomEvent
+        expect(relayed.type).toStrictEqual('mine')
+        expect(relayed.detail.mine).toBe(true)
     })
     test('clearing the debug callback stops the relay', () => {
         const debug = listener()
